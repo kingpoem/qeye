@@ -175,7 +175,7 @@ class _PersonalPageState extends State<PersonalPage> {
                     Navigator.pushAndRemoveUntil(
                       context,
                       MaterialPageRoute(builder: (context) => LoginPage()),
-                      (route) => false, // 清空历史路由，防止返回
+                      (route) => false,
                     );
                   },
                   style: ElevatedButton.styleFrom(

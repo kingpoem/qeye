@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:http/http.dart' as http;
 import 'dart:io';
+import 'dart:convert';
 
 class AIPage extends StatefulWidget {
   @override
@@ -10,9 +12,18 @@ class AIPage extends StatefulWidget {
 class _AIPageState extends State<AIPage> with TickerProviderStateMixin {
   late TabController _tabController;
   final TextEditingController _questionController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   final List<ChatMessage> _messages = [];
   File? _selectedImage;
   final ImagePicker _picker = ImagePicker();
+  bool _isLoading = false;
+
+  // DeepSeek API配置
+  static const String DEEPSEEK_API_KEY = '';
+  static const String DEEPSEEK_API_URL =
+      'https://api.deepseek.com/chat/completions';
+  static const String SYSTEM_PROMPT =
+      '你是一个专业的眼科医生。你需要根据用户的描述或图片分析进行眼科诊断和建议。请以医学专业人士的角度进行回答。';
 
   @override
   void initState() {
@@ -32,11 +43,158 @@ class _AIPageState extends State<AIPage> with TickerProviderStateMixin {
     );
   }
 
+  Future<void> _callDeepSeekStreamAPI(String userMessage) async {
+    try {
+      setState(() {
+        _isLoading = true;
+        _messages.add(
+          ChatMessage(
+            text: userMessage,
+            isUser: true,
+            timestamp: DateTime.now(),
+          ),
+        );
+      });
+
+      _scrollToBottom();
+
+      final request = http.Request('POST', Uri.parse(DEEPSEEK_API_URL));
+      request.headers.update(
+        'Authorization',
+        (value) => 'Bearer $DEEPSEEK_API_KEY',
+        ifAbsent: () => 'Bearer $DEEPSEEK_API_KEY',
+      );
+      request.headers['Content-Type'] = 'application/json';
+
+      request.body = jsonEncode({
+        'model': 'deepseek-chat',
+        'messages': [
+          {'role': 'system', 'content': SYSTEM_PROMPT},
+          {'role': 'user', 'content': userMessage},
+        ],
+        'stream': true,
+        'temperature': 0.7,
+      });
+
+      final response = await request.send();
+
+      if (response.statusCode == 200) {
+        String fullContent = '';
+        ChatMessage aiMessage = ChatMessage(
+          text: '',
+          isUser: false,
+          timestamp: DateTime.now(),
+        );
+
+        setState(() {
+          _messages.add(aiMessage);
+        });
+
+        _scrollToBottom();
+
+        // 处理流式响应
+        response.stream
+            .transform(utf8.decoder)
+            .listen(
+              (String chunk) {
+                final lines = chunk.split('\n');
+                for (String line in lines) {
+                  if (line.startsWith('data: ')) {
+                    final data = line.substring(6);
+                    if (data == '[DONE]') {
+                      setState(() {
+                        _isLoading = false;
+                      });
+                      return;
+                    }
+
+                    try {
+                      final json = jsonDecode(data);
+                      final delta = json['choices'][0]['delta'];
+
+                      if (delta['content'] != null) {
+                        fullContent += delta['content'];
+
+                        setState(() {
+                          _messages[_messages.length - 1] = ChatMessage(
+                            text: fullContent,
+                            isUser: false,
+                            timestamp: aiMessage.timestamp,
+                          );
+                        });
+
+                        _scrollToBottom();
+                      }
+                    } catch (e) {
+                      print('解析JSON出错: $e');
+                    }
+                  }
+                }
+              },
+              onError: (error) {
+                setState(() {
+                  _isLoading = false;
+                });
+                _showErrorMessage('流式请求出错: $error');
+              },
+            );
+      } else {
+        setState(() {
+          _isLoading = false;
+        });
+        _showErrorMessage('API请求失败: ${response.statusCode}');
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      _showErrorMessage('调用API出错: $e');
+    }
+  }
+
+  /// 自动滚动到底部 - 完整实现
+  void _scrollToBottom() {
+    if (_scrollController.hasClients) {
+      Future.delayed(Duration(milliseconds: 100), () {
+        if (_scrollController.hasClients) {
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent,
+            duration: Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        }
+      });
+    } else {
+      // 如果hasClients为false，稍后重试一次
+      Future.delayed(Duration(milliseconds: 200), () {
+        if (_scrollController.hasClients) {
+          _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+        }
+      });
+    }
+  }
+
+  void _jumpToBottom() {
+    if (_scrollController.hasClients) {
+      Future.delayed(Duration(milliseconds: 50), () {
+        if (_scrollController.hasClients) {
+          _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+        }
+      });
+    }
+  }
+
+  void _showErrorMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('AI智能助手'),
+        title: Text('AI眼科助手'),
         backgroundColor: Colors.white,
         elevation: 0,
         bottom: TabBar(
@@ -63,6 +221,7 @@ class _AIPageState extends State<AIPage> with TickerProviderStateMixin {
       children: [
         Expanded(
           child: ListView.builder(
+            controller: _scrollController,
             padding: EdgeInsets.all(16),
             itemCount: _messages.length,
             itemBuilder: (context, index) {
@@ -82,6 +241,7 @@ class _AIPageState extends State<AIPage> with TickerProviderStateMixin {
         mainAxisAlignment: message.isUser
             ? MainAxisAlignment.end
             : MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           if (!message.isUser) ...[
             CircleAvatar(
@@ -146,12 +306,13 @@ class _AIPageState extends State<AIPage> with TickerProviderStateMixin {
         children: [
           IconButton(
             icon: Icon(Icons.camera_alt),
-            onPressed: _pickImage,
+            onPressed: _isLoading ? null : _pickImage,
             color: Color(0xFF1976D2),
           ),
           Expanded(
             child: TextField(
               controller: _questionController,
+              enabled: !_isLoading,
               decoration: InputDecoration(
                 hintText: '请输入您的问题...',
                 border: OutlineInputBorder(
@@ -171,9 +332,18 @@ class _AIPageState extends State<AIPage> with TickerProviderStateMixin {
           SizedBox(width: 8),
           FloatingActionButton(
             mini: true,
-            onPressed: _sendMessage,
-            backgroundColor: Color(0xFF1976D2),
-            child: Icon(Icons.send, color: Colors.white),
+            onPressed: _isLoading ? null : _sendMessage,
+            backgroundColor: _isLoading ? Colors.grey : Color(0xFF1976D2),
+            child: _isLoading
+                ? SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                : Icon(Icons.send, color: Colors.white),
           ),
         ],
       ),
@@ -186,7 +356,6 @@ class _AIPageState extends State<AIPage> with TickerProviderStateMixin {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 上传图片区域
           Container(
             width: double.infinity,
             height: 200,
@@ -199,7 +368,7 @@ class _AIPageState extends State<AIPage> with TickerProviderStateMixin {
             ),
             child: _selectedImage == null
                 ? InkWell(
-                    onTap: _pickImage,
+                    onTap: _isLoading ? null : _pickImage,
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -254,8 +423,6 @@ class _AIPageState extends State<AIPage> with TickerProviderStateMixin {
                   ),
           ),
           SizedBox(height: 16),
-
-          // 诊断选项
           Text(
             '选择诊断类型：',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
@@ -274,12 +441,12 @@ class _AIPageState extends State<AIPage> with TickerProviderStateMixin {
             ],
           ),
           SizedBox(height: 24),
-
-          // 开始诊断按钮
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: _selectedImage != null ? _startDiagnosis : null,
+              onPressed: (_selectedImage != null && !_isLoading)
+                  ? _startDiagnosis
+                  : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Color(0xFF1976D2),
                 padding: EdgeInsets.symmetric(vertical: 16),
@@ -293,31 +460,6 @@ class _AIPageState extends State<AIPage> with TickerProviderStateMixin {
               ),
             ),
           ),
-          SizedBox(height: 16),
-
-          // 诊断结果区域
-          if (_selectedImage != null) ...[
-            Container(
-              width: double.infinity,
-              padding: EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Color(0xFFF8F9FA),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Color(0xFFE0E0E0)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'AI诊断结果：',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  SizedBox(height: 8),
-                  Text('正在分析中...', style: TextStyle(color: Color(0xFF666666))),
-                ],
-              ),
-            ),
-          ],
         ],
       ),
     );
@@ -329,7 +471,6 @@ class _AIPageState extends State<AIPage> with TickerProviderStateMixin {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 症状选择
           Text(
             '请选择您的症状：',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
@@ -352,8 +493,6 @@ class _AIPageState extends State<AIPage> with TickerProviderStateMixin {
             ],
           ),
           SizedBox(height: 24),
-
-          // 严重程度
           Text(
             '症状严重程度：',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
@@ -369,8 +508,6 @@ class _AIPageState extends State<AIPage> with TickerProviderStateMixin {
             ],
           ),
           SizedBox(height: 24),
-
-          // 持续时间
           Text(
             '症状持续时间：',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
@@ -388,12 +525,10 @@ class _AIPageState extends State<AIPage> with TickerProviderStateMixin {
             ],
           ),
           SizedBox(height: 24),
-
-          // 分析按钮
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: _analyzeSymptoms,
+              onPressed: (!_isLoading) ? _analyzeSymptoms : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Color(0xFF1976D2),
                 padding: EdgeInsets.symmetric(vertical: 16),
@@ -405,32 +540,6 @@ class _AIPageState extends State<AIPage> with TickerProviderStateMixin {
                 '开始症状分析',
                 style: TextStyle(fontSize: 16, color: Colors.white),
               ),
-            ),
-          ),
-          SizedBox(height: 16),
-
-          // 分析结果
-          Container(
-            width: double.infinity,
-            padding: EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Color(0xFFF8F9FA),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Color(0xFFE0E0E0)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '分析结果：',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                SizedBox(height: 8),
-                Text(
-                  '请先选择症状进行智能分析',
-                  style: TextStyle(color: Color(0xFF666666)),
-                ),
-              ],
             ),
           ),
         ],
@@ -491,44 +600,8 @@ class _AIPageState extends State<AIPage> with TickerProviderStateMixin {
 
   void _sendMessage() {
     if (_questionController.text.trim().isEmpty) return;
-
-    setState(() {
-      _messages.add(
-        ChatMessage(
-          text: _questionController.text.trim(),
-          isUser: true,
-          timestamp: DateTime.now(),
-        ),
-      );
-    });
-
-    // 模拟AI回复
-    Future.delayed(Duration(seconds: 1), () {
-      setState(() {
-        _messages.add(
-          ChatMessage(
-            text: _getAIResponse(_questionController.text.trim()),
-            isUser: false,
-            timestamp: DateTime.now(),
-          ),
-        );
-      });
-    });
-
+    _callDeepSeekStreamAPI(_questionController.text.trim());
     _questionController.clear();
-  }
-
-  String _getAIResponse(String question) {
-    // 简单的关键词匹配回复
-    if (question.contains('近视') || question.contains('视力')) {
-      return "根据您的描述，建议您：\n\n1. 定期进行视力检查\n2. 保持良好的用眼习惯\n3. 适当进行眼部运动\n4. 如有持续恶化，请及时就医\n\n建议您预约专业眼科医生进行详细检查。";
-    } else if (question.contains('干眼') || question.contains('干涩')) {
-      return "干眼症是常见眼部疾病，建议：\n\n1. 使用人工泪液\n2. 避免长时间用眼\n3. 保持室内湿度\n4. 多眨眼，保持眼部湿润\n5. 如症状严重，请咨询医生";
-    } else if (question.contains('疼痛') || question.contains('痛')) {
-      return "眼部疼痛可能的原因：\n\n1. 眼疲劳\n2. 眼部感染\n3. 青光眼\n4. 角膜问题\n\n建议您立即就医检查，眼部疼痛不可忽视。";
-    } else {
-      return "感谢您的咨询。根据您的描述，建议您：\n\n1. 注意眼部卫生\n2. 避免过度用眼\n3. 定期进行眼部检查\n4. 如有持续症状，请及时就医\n\n如需更详细的诊断，建议上传眼部图片或预约专家咨询。";
-    }
   }
 
   void _startDiagnosis() {
@@ -547,7 +620,6 @@ class _AIPageState extends State<AIPage> with TickerProviderStateMixin {
       ),
     );
 
-    // 模拟诊断过程
     Future.delayed(Duration(seconds: 3), () {
       Navigator.pop(context);
       _showDiagnosisResult();
@@ -575,72 +647,13 @@ class _AIPageState extends State<AIPage> with TickerProviderStateMixin {
             onPressed: () => Navigator.pop(context),
             child: Text('确定'),
           ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _tabController.animateTo(0); // 切换到问答页面
-            },
-            child: Text('咨询专家'),
-          ),
         ],
       ),
     );
   }
 
   void _analyzeSymptoms() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('症状分析'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('正在分析您的症状，请稍候...'),
-          ],
-        ),
-      ),
-    );
-
-    // 模拟分析过程
-    Future.delayed(Duration(seconds: 2), () {
-      Navigator.pop(context);
-      _showAnalysisResult();
-    });
-  }
-
-  void _showAnalysisResult() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('分析结果'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('根据您的症状描述：', style: TextStyle(fontWeight: FontWeight.bold)),
-            SizedBox(height: 8),
-            Text('• 可能原因：眼疲劳、干眼症\n• 建议措施：休息、滴眼药水\n• 紧急程度：一般\n• 建议就医：如症状持续'),
-            SizedBox(height: 16),
-            Text('注意：此分析仅供参考，具体诊断请咨询专业医生。'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('确定'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _tabController.animateTo(0); // 切换到问答页面
-            },
-            child: Text('详细咨询'),
-          ),
-        ],
-      ),
-    );
+    _callDeepSeekStreamAPI('请根据以上症状信息进行专业眼科分析和建议');
   }
 
   String _formatTime(DateTime time) {
@@ -651,6 +664,7 @@ class _AIPageState extends State<AIPage> with TickerProviderStateMixin {
   void dispose() {
     _tabController.dispose();
     _questionController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 }
