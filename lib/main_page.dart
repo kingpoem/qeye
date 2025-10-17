@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'personal_page.dart';
 import 'home_page.dart';
+import 'expert_page.dart';
+import 'ai_page.dart';
+import 'report_page.dart';
 
 class MainPage extends StatefulWidget {
   @override
@@ -15,13 +18,7 @@ class _MainPageState extends State<MainPage> {
   @override
   void initState() {
     super.initState();
-    _pages = [
-      HomePage(),
-      Center(child: Text("Hello 专家")),
-      Center(child: Text("Hello AI")),
-      Center(child: Text("Hello 报告")),
-      PersonalPage(),
-    ];
+    _pages = [HomePage(), ExpertPage(), AIPage(), ReportPage(), PersonalPage()];
   }
 
   @override

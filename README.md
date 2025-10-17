@@ -1,14 +1,54 @@
-# qeye
+# QEye - 眼科医疗智能助手
 
-Cure your eye.
+一个专业的眼科医疗Flutter应用，集成了专家咨询、AI智能诊断、检查报告管理等功能。
 
-An app for competition.
+## 功能特色
 
-使用 [dart](https://dart.cn) 语言
+### 🏠 首页
+- 眼部疾病案例推荐
+- 图片上传预览功能
+- 功能中心展示
 
-## Getting start
+### 👨‍⚕️ 专家咨询
+- 专家列表浏览
+- 按科室筛选专家
+- 专家详情查看
+- 在线预约功能
+- 专家评分和评价
 
-先开启 Android Studio
+### 🤖 AI智能助手
+- **AI问答**: 智能回答眼部健康问题
+- **智能诊断**: 上传眼部图片进行AI分析
+- **症状分析**: 根据症状描述进行智能分析
+
+### 📊 检查报告
+- 检查报告列表管理
+- 报告详情查看
+- 数据统计图表
+- 视力趋势分析
+- 健康建议推送
+
+### 👤 个人中心
+- 用户信息管理
+- 我的问诊记录
+- 我的处方管理
+- 设置和帮助
+
+## 技术栈
+
+- **Flutter**: 跨平台移动应用开发框架
+- **Provider**: 状态管理
+- **HTTP**: 网络请求
+- **Image Picker**: 图片选择
+- **FL Chart**: 图表展示
+- **Intl**: 国际化支持
+
+## 安装运行
+
+1. 确保已安装Flutter SDK
+2. 克隆项目到本地
+3. 运行 `flutter pub get` 安装依赖
+4. 运行 `flutter run` 启动应用
 
 ```shell
 flutter devices
@@ -16,3 +56,41 @@ flutter run // or you can select type by `flutter run -d emulator-xxx`
 ```
 
 按 `r` 热重载
+
+## 项目结构
+
+```
+lib/
+├── main.dart              # 应用入口
+├── main_page.dart         # 主页面（底部导航）
+├── login_page.dart        # 登录页面
+├── home_page.dart         # 首页
+├── expert_page.dart       # 专家咨询页面
+├── ai_page.dart          # AI智能助手页面
+├── report_page.dart      # 检查报告页面
+└── personal_page.dart    # 个人中心页面
+```
+
+## 主要特性
+
+- 🎨 现代化UI设计
+- 📱 响应式布局
+- 🔍 智能搜索功能
+- 📊 数据可视化
+- 🖼️ 图片上传分析
+- 💬 实时聊天界面
+- 📅 预约管理
+- 📈 趋势分析
+
+## 开发说明
+
+这是一个演示项目，展示了如何构建一个完整的医疗应用。在实际部署时，需要：
+
+1. 集成真实的API接口
+2. 添加用户认证系统
+3. 实现数据持久化
+4. 添加推送通知
+5. 完善错误处理
+6. 添加单元测试
+
+使用 [dart](https://dart.cn) 语言开发

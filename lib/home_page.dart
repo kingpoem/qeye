@@ -30,10 +30,7 @@ class HomePage extends StatelessWidget {
               padding: EdgeInsets.all(16),
               child: Text(
                 '推荐眼部疾病案例',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
             ),
             // 第一行标签
@@ -129,10 +126,7 @@ class HomePage extends StatelessWidget {
               padding: EdgeInsets.symmetric(horizontal: 16),
               child: Text(
                 '功能中心',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
             ),
             SizedBox(height: 12),
@@ -211,17 +205,14 @@ class HomePage extends StatelessWidget {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
                   color: Colors.blue[100],
-              ),
+                ),
                 child: Icon(icon, size: 48, color: Colors.blue),
               ),
               Padding(
                 padding: EdgeInsets.all(8),
                 child: Text(
                   title,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
                   textAlign: TextAlign.center,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
