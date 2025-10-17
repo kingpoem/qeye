@@ -19,11 +19,6 @@ class LoginPage extends StatelessWidget {
                 style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
-              const Text(
-                "做题全队工作室",
-                style: TextStyle(fontSize: 18, color: Colors.grey),
-              ),
-              const SizedBox(height: 30),
               SizedBox(
                 width: 220,
                 height: 220,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'personal_page.dart';
 
 class MainPage extends StatefulWidget {
   @override
@@ -8,13 +9,19 @@ class MainPage extends StatefulWidget {
 class _MainPageState extends State<MainPage> {
   int _currentIndex = 0;
 
-  final List<Widget> _pages = [
-    Center(child: Text("Hello 首页")),
-    Center(child: Text("Hello 专家")),
-    Center(child: Text("Hello AI")),
-    Center(child: Text("Hello 报告")),
-    Center(child: Text("Hello 个人")),
-  ];
+  late final List<Widget> _pages;
+
+  @override
+  void initState() {
+    super.initState();
+    _pages = [
+      Center(child: Text("Hello 首页")),
+      Center(child: Text("Hello 专家")),
+      Center(child: Text("Hello AI")),
+      Center(child: Text("Hello 报告")),
+      PersonalPage(),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
